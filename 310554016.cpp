@@ -65,27 +65,13 @@ class ofInfo{
 };
 
 ofInfo::ofInfo(){
-    command = (char*)calloc(2, sizeof(char));
-    command[0] = ' ';
-    command[1] = '\0';
-    pid = (char*)calloc(2, sizeof(char));
-    pid[0] = ' ';
-    pid[1] = '\0';
-    user = (char*)calloc(2, sizeof(char));
-    user[0] = ' ';
-    user[1] = '\0';
-    fd = (char*)calloc(2, sizeof(char));
-    fd[0] = ' ';
-    fd[1] = '\0';
-    type = (char*)calloc(2, sizeof(char));
-    type[0] = ' ';
-    type[1] = '\0';
-    inode = (char*)calloc(2, sizeof(char));
-    inode[0] = ' ';
-    inode[1] = '\0';
-    name = (char*)calloc(2, sizeof(char));
-    name[0] = ' ';
-    name[1] = '\0';
+    command = (char*)calloc(50, sizeof(char));
+    pid = (char*)calloc(50, sizeof(char));
+    user = (char*)calloc(50, sizeof(char));
+    fd = (char*)calloc(50, sizeof(char));
+    type = (char*)calloc(50, sizeof(char));
+    inode = (char*)calloc(50, sizeof(char));
+    name = (char*)calloc(255, sizeof(char));
 }
 
 void print_of_info_vector(std::vector<ofInfo> of_info_vector, char* command_regex, char* type_regex, char* name_regex){
@@ -196,13 +182,15 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
     char* pid_path = concatString(proc_root, pid);
     char* status_path = concatString(pid_path, "/status");
 
+    std::vector<ofInfo> pid_of_vector;
+
     FILE *fp;
     char* line = NULL;
     size_t len = 0;
     ssize_t read;
     
     const char* command;
-    char* uid;
+    char* uid = (char*)calloc(50, sizeof(char));
     const char* user;
 
     // get the status from current process
@@ -292,7 +280,7 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 strcpy(of_info.name,real_path);
             }
         }
-        of_vector.push_back(of_info);
+        pid_of_vector.push_back(of_info);
     }
     
     
@@ -303,7 +291,6 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
         fp = fopen(maps_path, "r");
         if(fp != NULL)
         {
-            std::vector<ofInfo> tmp_vector;
             while((read = getline(&line, &len, fp)) != -1)
             {
                 ofInfo of_info;
@@ -338,12 +325,12 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                     continue;
                 }
                 bool exist_flag = false;
-                for(int i=0;i<tmp_vector.size();i++){
-                    if(strcmp(tmp_vector[i].inode, inode) == 0){
+                for(int i=0;i<pid_of_vector.size();i++){
+                    if(strcmp(pid_of_vector[i].inode, inode) == 0){
                         exist_flag = true;
                         break;
                     }
-                    if(strcmp(tmp_vector[i].name, pathname) == 0){
+                    if(strcmp(pid_of_vector[i].name, pathname) == 0){
                         exist_flag = true;
                         break;
                     }
@@ -362,11 +349,7 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 strcpy(of_info.inode,concatString(inode,"\0"));
                 strcpy(of_info.name,concatString(pathname,"\0"));
                 // of_info.print();
-                tmp_vector.push_back(of_info);
-            }
-
-            for(int i=0;i<tmp_vector.size();i++){
-                of_vector.push_back(tmp_vector[i]);
+                pid_of_vector.push_back(of_info);
             }
 
             fclose(fp);
@@ -394,9 +377,9 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 continue;
             }
             else{
-                struct stat buf;
-                lstat(link_path, &buf);
-                int flag = (buf.st_mode >> 7) & 3;
+                struct stat *lbuf = (struct stat*)malloc(sizeof(struct stat));
+                lstat(link_path, lbuf);
+                int flag = (lbuf->st_mode >> 7) & 3;
                 if(flag == 1){
                     of_info.fd = concatString(of_info.fd, "w"); 
                 }
@@ -408,9 +391,12 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 }
                 char* save_ptr;
                 strcpy(of_info.name,strtok_r(real_path," ",&save_ptr));
+                free(lbuf);
                 
-                stat(link_path, &buf);
-                switch(buf.st_mode & S_IFMT){
+                
+                struct stat *sbuf = (struct stat*)malloc(sizeof(struct stat));
+                stat(link_path, sbuf);
+                switch(sbuf->st_mode & S_IFMT){
                     case S_IFREG:
                         strcpy(of_info.type,"REG");
                         break;
@@ -434,12 +420,16 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                         break;
                 }
                 char* inode_arr = (char*)calloc(10,sizeof(char));
-                sprintf(inode_arr,"%ld",buf.st_ino);
+                sprintf(inode_arr,"%ld",sbuf->st_ino);
                 strcpy(of_info.inode,inode_arr);
-                of_vector.push_back(of_info);
+                pid_of_vector.push_back(of_info);
             }
         }
         closedir(fd_d);
+    }
+
+    for(int i=0;i<pid_of_vector.size();i++){
+        of_vector.push_back(pid_of_vector[i]);
     }
 }
 
