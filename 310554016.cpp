@@ -88,7 +88,7 @@ ofInfo::ofInfo(){
     name[1] = '\0';
 }
 
-void print_of_info_vector(std::vector<ofInfo> of_info_vector){
+void print_of_info_vector(std::vector<ofInfo> of_info_vector, char* command_regex, char* type_regex, char* name_regex){
     int max_command = 0;
     int max_pid = 0;
     int max_user = 0;
@@ -104,7 +104,58 @@ void print_of_info_vector(std::vector<ofInfo> of_info_vector){
         max_inode = std::max(max_inode, (int)strlen(of_info_vector[i].inode));
     }
 
-    for(int i=0;i<of_info_vector.size();i++){
+    std::cout << of_info_vector[0].command;
+    for (int j=0;j<max_command-strlen(of_info_vector[0].command);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].pid;
+    for (int j=0;j<max_pid-strlen(of_info_vector[0].pid);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].user;
+    for (int j=0;j<max_user-strlen(of_info_vector[0].user);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].fd;
+    for (int j=0;j<max_fd-strlen(of_info_vector[0].fd);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].type;
+    for (int j=0;j<max_type-strlen(of_info_vector[0].type);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].inode;
+    for (int j=0;j<max_inode-strlen(of_info_vector[0].inode);j++){
+        std::cout << " ";
+    }
+    std::cout << "    ";
+    std::cout << of_info_vector[0].name << std::endl;
+
+    for(int i=1;i<of_info_vector.size();i++){
+        if(command_regex != NULL){
+            std::regex c_regex(command_regex);
+            if(!std::regex_search(of_info_vector[i].command, c_regex)){
+                continue;
+            }
+        }
+        if(type_regex != NULL){
+            std::regex t_regex(type_regex);
+            if(!std::regex_search(of_info_vector[i].type, t_regex)){
+                continue;
+            }
+        }
+        if(name_regex != NULL){
+            std::regex n_regex(name_regex);
+            if(!std::regex_search(of_info_vector[i].name, n_regex)){
+                continue;
+            }
+        }
+
         std::cout << of_info_vector[i].command;
         for (int j=0;j<max_command-strlen(of_info_vector[i].command);j++){
             std::cout << " ";
@@ -157,7 +208,6 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
     // get the status from current process
     fp = fopen(status_path, "r");
     if(fp == NULL){
-        std::cout << "cannot open pid command\n";
         return;
     }
     while((read = getline(&line, &len, fp)) != -1)
@@ -215,9 +265,31 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 stat(real_path, buf);
                 char* inode_arr = (char*)calloc(10,sizeof(char));
                 sprintf(inode_arr,"%ld",buf->st_ino);
-                strcpy(of_info.type,"DIR");
+                switch(buf->st_mode & S_IFMT){
+                    case S_IFREG:
+                        strcpy(of_info.type,"REG");
+                        break;
+                    case S_IFDIR:
+                        strcpy(of_info.type,"DIR");
+                        break;
+                    case S_IFBLK:
+                        strcpy(of_info.type,"BLK");
+                        break;
+                    case S_IFCHR:
+                        strcpy(of_info.type,"CHR");
+                        break;
+                    case S_IFIFO:
+                        strcpy(of_info.type,"FIFO");
+                        break;
+                    case S_IFSOCK:
+                        strcpy(of_info.type,"SOCK");
+                        break;
+                    default:
+                        strcpy(of_info.type,"unknown");
+                        break;
+                }
                 strcpy(of_info.inode,inode_arr);
-                strcpy(of_info.name,concatString(link_path, real_path));
+                strcpy(of_info.name,real_path);
             }
         }
         of_vector.push_back(of_info);
@@ -229,78 +301,76 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
     if (access(maps_path, R_OK) == 0)
     {
         fp = fopen(maps_path, "r");
-        if(fp == NULL){
-            std::cout << "cannot open maps command\n";
-            return;
-        }
-        while((read = getline(&line, &len, fp)) != -1)
+        if(fp != NULL)
         {
-            ofInfo of_info;
-            strcpy(of_info.command,command);
-            strcpy(of_info.pid,pid);
-            strcpy(of_info.user,user);
-            strtok(line, "\n");
-            char* savePtr;
-            
-            // std::cout << "line: " << line << std::endl;
-            
-            char* memory_part = NULL;
-            char* permission = NULL;
-            char* offset = NULL;
-            char* dev = NULL;
-            char* inode = NULL;
-            char* pathname = NULL;
-            char* deleted = NULL;
+            std::vector<ofInfo> tmp_vector;
+            while((read = getline(&line, &len, fp)) != -1)
+            {
+                ofInfo of_info;
+                strcpy(of_info.command,command);
+                strcpy(of_info.pid,pid);
+                strcpy(of_info.user,user);
+                strtok(line, "\n");
+                char* savePtr;
+                
+                char* memory_part = NULL;
+                char* permission = NULL;
+                char* offset = NULL;
+                char* dev = NULL;
+                char* inode = NULL;
+                char* pathname = NULL;
+                char* deleted = NULL;
 
-            memory_part = strtok_r(line," ",&savePtr);
-            permission = strtok_r(NULL," ",&savePtr);
-            offset = strtok_r(NULL," ",&savePtr);
-            dev = strtok_r(NULL," ",&savePtr);
-            inode = strtok_r(NULL," ",&savePtr);
-            pathname = strtok_r(NULL," ",&savePtr);
-            if(strcmp(savePtr, "") == 0){
-                deleted = NULL;
-            }
-            else{
-                deleted = savePtr;
-            }
-            // if(pathname!=NULL)
-            // {
-            //     std::cout << "pathname" << pathname << std::endl;
-            //     std::cout << "savePtr" << savePtr << std::endl;
-            // }
-            
-            if(strcmp(inode, "0") == 0 || pathname == NULL){
-                continue;
-            }
-            bool exist_flag = false;
-            for(int i=0;i<of_vector.size();i++){
-                if(strcmp(of_vector[i].inode, inode) == 0){
-                    exist_flag = true;
-                    break;
+                memory_part = strtok_r(line," ",&savePtr);
+                permission = strtok_r(NULL," ",&savePtr);
+                offset = strtok_r(NULL," ",&savePtr);
+                dev = strtok_r(NULL," ",&savePtr);
+                inode = strtok_r(NULL," ",&savePtr);
+                pathname = strtok_r(NULL," ",&savePtr);
+                if(strcmp(savePtr, "") == 0){
+                    deleted = NULL;
                 }
-                if(strcmp(of_vector[i].name, pathname) == 0){
-                    exist_flag = true;
-                    break;
+                else{
+                    deleted = savePtr;
                 }
-            }
-            if(exist_flag){
-                continue;
+                
+                if(strcmp(inode, "0") == 0 || pathname == NULL){
+                    continue;
+                }
+                bool exist_flag = false;
+                for(int i=0;i<tmp_vector.size();i++){
+                    if(strcmp(tmp_vector[i].inode, inode) == 0){
+                        exist_flag = true;
+                        break;
+                    }
+                    if(strcmp(tmp_vector[i].name, pathname) == 0){
+                        exist_flag = true;
+                        break;
+                    }
+                }
+                if(exist_flag){
+                    continue;
+                }
+
+                if(deleted == NULL){
+                    strcpy(of_info.fd,"mem");
+                }
+                else{
+                    strcpy(of_info.fd,"DEL");
+                }
+                strcpy(of_info.type,"REG");
+                strcpy(of_info.inode,concatString(inode,"\0"));
+                strcpy(of_info.name,concatString(pathname,"\0"));
+                // of_info.print();
+                tmp_vector.push_back(of_info);
             }
 
-            if(deleted == NULL){
-                strcpy(of_info.fd,"mem");
+            for(int i=0;i<tmp_vector.size();i++){
+                of_vector.push_back(tmp_vector[i]);
             }
-            else{
-                strcpy(of_info.fd,"DEL");
-            }
-            strcpy(of_info.type,"REG");
-            strcpy(of_info.inode,concatString(inode,"\0"));
-            strcpy(of_info.name,concatString(pathname,"\0"));
-            // of_info.print();
-            of_vector.push_back(of_info);
+
+            fclose(fp);
         }
-        fclose(fp);
     }
 
     // handling the fd files
@@ -336,7 +406,8 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 else if(flag == 3){
                     of_info.fd = concatString(of_info.fd, "u"); 
                 }
-                strcpy(of_info.name,real_path);
+                char* save_ptr;
+                strcpy(of_info.name,strtok_r(real_path," ",&save_ptr));
                 
                 stat(link_path, &buf);
                 switch(buf.st_mode & S_IFMT){
@@ -372,13 +443,33 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
     }
 }
 
-int main(){
+int main(int argc, char*argv[] ){
+    char *command_regex_str = NULL;
+    char *type_regex_str = NULL;
+    char *name_regex_str = NULL;
+    for(int i=1;i<argc;i++){
+        if(strcmp(argv[i], "-c") == 0){
+            if(i+1<argc){
+                command_regex_str = argv[i+1];
+            }
+        }
+        if(strcmp(argv[i], "-t") == 0){
+            if(i+1<argc){
+                type_regex_str = argv[i+1];
+            }
+        }
+        if(strcmp(argv[i], "-f") == 0){
+            if(i+1<argc){
+                name_regex_str = argv[i+1];
+            }
+        }
+    }
+
     std::vector<const char*> proc_vector;
 
     DIR *d;
     struct dirent *dir;
     std::regex pidRegex("^[0-9]*$");
-    std::smatch m;
 
     d = opendir("/proc");
     while((dir = readdir(d)) != NULL) {
@@ -401,11 +492,9 @@ int main(){
     of_vector.push_back(head_of_info);
 
     for(int i=0;i<proc_vector.size();i++){
-        if(strcmp(proc_vector[i],"141") == 0){
-            traversePid(proc_vector[i], of_vector);
-        }
+        traversePid(proc_vector[i], of_vector);
     }
 
-    print_of_info_vector(of_vector);
+    print_of_info_vector(of_vector, command_regex_str, type_regex_str, name_regex_str);
     return 0;
 }
