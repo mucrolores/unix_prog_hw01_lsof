@@ -24,6 +24,12 @@ char* concatString(const char* c1,const char* c2){
     return result;
 }
 
+void m_strcpy(char* &dst, const char* src){
+    
+    dst=(char*)calloc(strlen(src)+1, sizeof(char));
+    strcpy(dst, src);
+}
+
 const char* getUserName(uid_t uid){
     struct passwd *user;
     user = getpwuid(uid);
@@ -53,7 +59,6 @@ char* trimString(char* str){
 
 class ofInfo{
     public:
-        ofInfo();
         void print();
         char* command;
         char* pid;
@@ -63,16 +68,6 @@ class ofInfo{
         char* inode;
         char* name;
 };
-
-ofInfo::ofInfo(){
-    command = (char*)calloc(50, sizeof(char));
-    pid = (char*)calloc(50, sizeof(char));
-    user = (char*)calloc(50, sizeof(char));
-    fd = (char*)calloc(50, sizeof(char));
-    type = (char*)calloc(50, sizeof(char));
-    inode = (char*)calloc(50, sizeof(char));
-    name = (char*)calloc(1000, sizeof(char));
-}
 
 void print_of_info_vector(std::vector<ofInfo> of_info_vector, char* command_regex, char* type_regex, char* name_regex){
     int max_command = 0;
@@ -189,8 +184,8 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
     size_t len = 0;
     ssize_t read;
     
-    const char* command;
-    char* uid = (char*)calloc(50, sizeof(char));
+    const char* command = NULL;
+    char* uid = (char*)calloc(100, sizeof(char));
     const char* user;
 
     // get the status from current process
@@ -206,7 +201,7 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
             command = trimString(savePtr);
         }
         if(strcmp(title, "Uid") == 0){
-            strcpy(uid,strtok_r(NULL," \t", &savePtr));
+            m_strcpy(uid,strtok_r(NULL," \t", &savePtr));
         }
     }
     fclose(fp);
@@ -229,17 +224,17 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
 
     for(int i=0;i<4;i++){
         ofInfo of_info;
-        strcpy(of_info.command,command);
-        strcpy(of_info.pid,pid);
-        strcpy(of_info.user,user);
-        strcpy(of_info.name, concatString(concatString(pid_path,"/"), special_files[i]));
-        strcpy(of_info.fd,tag_fd[i]);
+        m_strcpy(of_info.command,command);
+        m_strcpy(of_info.pid,pid);
+        m_strcpy(of_info.user,user);
+        m_strcpy(of_info.name, concatString(concatString(pid_path,"/"), special_files[i]));
+        m_strcpy(of_info.fd,tag_fd[i]);
         char *link_path = concatString(concatString(pid_path,"/"), special_files[i]);
         if (access(link_path, R_OK) != 0){
-            strcpy(of_info.type,"unknown");
-            strcpy(of_info.name,concatString(link_path, " (Permission denied)"));
+            m_strcpy(of_info.type,"unknown");
+            m_strcpy(of_info.name,concatString(link_path, " (Permission denied)"));
             if(i == 3){
-                strcpy(of_info.fd,"NOFD");
+                m_strcpy(of_info.fd,"NOFD");
             }
         }
         else{
@@ -255,29 +250,29 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 sprintf(inode_arr,"%ld",buf->st_ino);
                 switch(buf->st_mode & S_IFMT){
                     case S_IFREG:
-                        strcpy(of_info.type,"REG");
+                        m_strcpy(of_info.type,"REG");
                         break;
                     case S_IFDIR:
-                        strcpy(of_info.type,"DIR");
+                        m_strcpy(of_info.type,"DIR");
                         break;
                     case S_IFBLK:
-                        strcpy(of_info.type,"BLK");
+                        m_strcpy(of_info.type,"BLK");
                         break;
                     case S_IFCHR:
-                        strcpy(of_info.type,"CHR");
+                        m_strcpy(of_info.type,"CHR");
                         break;
                     case S_IFIFO:
-                        strcpy(of_info.type,"FIFO");
+                        m_strcpy(of_info.type,"FIFO");
                         break;
                     case S_IFSOCK:
-                        strcpy(of_info.type,"SOCK");
+                        m_strcpy(of_info.type,"SOCK");
                         break;
                     default:
-                        strcpy(of_info.type,"unknown");
+                        m_strcpy(of_info.type,"unknown");
                         break;
                 }
-                strcpy(of_info.inode,inode_arr);
-                strcpy(of_info.name,real_path);
+                m_strcpy(of_info.inode,inode_arr);
+                m_strcpy(of_info.name,real_path);
             }
         }
         pid_of_vector.push_back(of_info);
@@ -294,9 +289,9 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
             while((read = getline(&line, &len, fp)) != -1)
             {
                 ofInfo of_info;
-                strcpy(of_info.command,command);
-                strcpy(of_info.pid,pid);
-                strcpy(of_info.user,user);
+                m_strcpy(of_info.command,command);
+                m_strcpy(of_info.pid,pid);
+                m_strcpy(of_info.user,user);
                 strtok(line, "\n");
                 char* savePtr;
                 
@@ -340,15 +335,14 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 }
 
                 if(deleted == NULL){
-                    strcpy(of_info.fd,"mem");
+                    m_strcpy(of_info.fd,"mem");
                 }
                 else{
-                    strcpy(of_info.fd,"DEL");
+                    m_strcpy(of_info.fd,"DEL");
                 }
-                strcpy(of_info.type,"REG");
-                strcpy(of_info.inode,concatString(inode,"\0"));
-                strcpy(of_info.name,concatString(pathname,"\0"));
-                // of_info.print();
+                m_strcpy(of_info.type,"REG");
+                m_strcpy(of_info.inode,concatString(inode,"\0"));
+                m_strcpy(of_info.name,concatString(pathname,"\0"));
                 pid_of_vector.push_back(of_info);
             }
 
@@ -366,10 +360,10 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
         fd_d = opendir(fd_path);
         while((fd_dir = readdir(fd_d)) != NULL) {
             ofInfo of_info;
-            strcpy(of_info.command,command);
-            strcpy(of_info.pid,pid);
-            strcpy(of_info.user,user);
-            strcpy(of_info.fd, fd_dir->d_name);
+            m_strcpy(of_info.command,command);
+            m_strcpy(of_info.pid,pid);
+            m_strcpy(of_info.user,user);
+            m_strcpy(of_info.fd, fd_dir->d_name);
             char *real_path = (char*)calloc(PATH_MAX, sizeof(char));
             char *link_path = concatString(fd_path,concatString("/", fd_dir->d_name));
             int len = readlink(link_path, real_path, PATH_MAX);
@@ -390,7 +384,7 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                     of_info.fd = concatString(of_info.fd, "u"); 
                 }
                 char* save_ptr;
-                strcpy(of_info.name,strtok_r(real_path," ",&save_ptr));
+                m_strcpy(of_info.name,strtok_r(real_path," ",&save_ptr));
                 free(lbuf);
                 
                 
@@ -398,30 +392,30 @@ void traversePid(const char *pid, std::vector<ofInfo> &of_vector){
                 stat(link_path, sbuf);
                 switch(sbuf->st_mode & S_IFMT){
                     case S_IFREG:
-                        strcpy(of_info.type,"REG");
+                        m_strcpy(of_info.type,"REG");
                         break;
                     case S_IFDIR:
-                        strcpy(of_info.type,"DIR");
+                        m_strcpy(of_info.type,"DIR");
                         break;
                     case S_IFBLK:
-                        strcpy(of_info.type,"BLK");
+                        m_strcpy(of_info.type,"BLK");
                         break;
                     case S_IFCHR:
-                        strcpy(of_info.type,"CHR");
+                        m_strcpy(of_info.type,"CHR");
                         break;
                     case S_IFIFO:
-                        strcpy(of_info.type,"FIFO");
+                        m_strcpy(of_info.type,"FIFO");
                         break;
                     case S_IFSOCK:
-                        strcpy(of_info.type,"SOCK");
+                        m_strcpy(of_info.type,"SOCK");
                         break;
                     default:
-                        strcpy(of_info.type,"unknown");
+                        m_strcpy(of_info.type,"unknown");
                         break;
                 }
                 char* inode_arr = (char*)calloc(10,sizeof(char));
                 sprintf(inode_arr,"%ld",sbuf->st_ino);
-                strcpy(of_info.inode,inode_arr);
+                m_strcpy(of_info.inode,inode_arr);
                 pid_of_vector.push_back(of_info);
             }
         }
@@ -455,6 +449,14 @@ int main(int argc, char*argv[] ){
         }
     }
 
+    if(type_regex_str!=NULL){
+        if(strcmp(type_regex_str,"REG") != 0 && strcmp(type_regex_str,"CHR") != 0 && strcmp(type_regex_str,"DIR") != 0 && strcmp(type_regex_str,"FIFO") != 0 && 
+        strcmp(type_regex_str,"SOCK") != 0 && strcmp(type_regex_str,"unknown") != 0){
+            std::cout << "Invalid TYPE option." << std::endl;
+            return 0;
+        }
+    }
+
     std::vector<const char*> proc_vector;
 
     DIR *d;
@@ -472,13 +474,13 @@ int main(int argc, char*argv[] ){
 
     std::vector<ofInfo> of_vector;
     ofInfo head_of_info;
-    strcpy(head_of_info.command, "COMMAND");
-    strcpy(head_of_info.pid, "PID");
-    strcpy(head_of_info.user, "USER");
-    strcpy(head_of_info.fd, "FD");
-    strcpy(head_of_info.type, "TYPE");
-    strcpy(head_of_info.inode, "NODE");
-    strcpy(head_of_info.name, "NAME");
+    m_strcpy(head_of_info.command, "COMMAND");
+    m_strcpy(head_of_info.pid, "PID");
+    m_strcpy(head_of_info.user, "USER");
+    m_strcpy(head_of_info.fd, "FD");
+    m_strcpy(head_of_info.type, "TYPE");
+    m_strcpy(head_of_info.inode, "NODE");
+    m_strcpy(head_of_info.name, "NAME");
     of_vector.push_back(head_of_info);
 
     for(int i=0;i<proc_vector.size();i++){
