@@ -1,5 +1,5 @@
 make:
-	g++ 310554016.cpp -o a.out
+	g++ hw1.cpp -o 310554016_hw1
 
 clean:
-	rm *.out
+	rm 310554016_hw1

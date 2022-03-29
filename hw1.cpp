@@ -71,7 +71,7 @@ ofInfo::ofInfo(){
     fd = (char*)calloc(50, sizeof(char));
     type = (char*)calloc(50, sizeof(char));
     inode = (char*)calloc(50, sizeof(char));
-    name = (char*)calloc(255, sizeof(char));
+    name = (char*)calloc(1000, sizeof(char));
 }
 
 void print_of_info_vector(std::vector<ofInfo> of_info_vector, char* command_regex, char* type_regex, char* name_regex){
